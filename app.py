@@ -5,6 +5,24 @@ import database
 # 1. Sabse upar Browser Tab ka naam badlein
 st.set_page_config(page_title="Gurukul Digital", layout="centered")
 
+# app.py me sabse upar yeh code jodein
+
+st.markdown("""
+    <style>
+        #MainMenu {visibility: hidden;}
+        footer {visibility: hidden;}
+        header {visibility: hidden;}
+    </style>
+""", unsafe_allow_html=True)
+
+# 🎯 ऐप के फ्रंट पेज पर आपका नया लोगो दिखाने के लिए:
+
+# आपके गिटहब से लोगो का डायरेक्ट लिंक
+logo_url = "https://raw.githubusercontent.com/Nitesh-gurukul/gurukul/main/logo.png"
+
+# लोगो को स्क्रीन पर दिखाने के लिए (width आप अपने हिसाब से 100, 150 या 200 कर सकते हैं)
+st.image(logo_url, width=180)
+
 # 2. Main Screen ki badi Heading ko badlein
 st.title("📚 Gurukul Digital (Class 7-10)")
 st.subheader("घर बैठे सुरक्षित और आसान पढ़ाई")
@@ -55,6 +73,8 @@ if not st.session_state.logged_in:
 else:
     # --- लॉगिन होने के बाद का डैशबोर्ड ---
     user_info = st.session_state.user_info
+    st.sidebar.image(logo_url, use_container_width=True)
+
     st.sidebar.write(f"👋 नमस्ते, **{user_info['name']}**")
     st.sidebar.write(f"रोल: `{user_info['role'].upper()}`")
     
