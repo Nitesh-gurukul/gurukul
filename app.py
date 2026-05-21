@@ -1,9 +1,45 @@
 import streamlit as st
 import auth
 import database
+import streamlit as st
+import database
 
-# 1. Sabse upar Browser Tab ka naam badlein
-st.set_page_config(page_title="Gurukul Digital", layout="centered")
+# =====================================================================
+# 🎯 यहाँ से नया कोड जोड़ें (इसे ढूंढने की ज़रूरत नहीं, सीधे पेस्ट करें)
+# =====================================================================
+
+# 1. अगर सेशन स्टेट में 'user' नहीं है, तो उसे यहाँ बना देते हैं
+if 'user' not in st.session_state:
+    st.session_state['user'] = None
+
+# 2. रिफ्रेश होने पर ऑटो-लॉगिन करने का लॉजिक
+if st.session_state['user'] is None and hasattr(st, "experimental_user"):
+    client_user = st.experimental_user
+    if client_user and client_user.get("email"):
+        # ईमेल से यूजरनेम निकालना
+        extracted_username = client_user["email"].split("@")[0]
+        # डेटाबेस से पूरी जानकारी निकालना
+        db_user = database.get_user_by_username(extracted_username)
+        if db_user:
+            u_username, u_name, u_role, u_class, u_subjects, u_status, u_mobile = db_user
+            if u_status == 'active':
+                st.session_state['user'] = {
+                    "username": u_username,
+                    "name": u_name,
+                    "role": u_role,
+                    "class": u_class
+                }
+
+# =====================================================================
+# 👆 यहाँ तक नया कोड पेस्ट करने के बाद आपका पुराना कोड वैसे ही रहेगा
+# =====================================================================
+
+# app.py में सबसे ऊपर इसे अपडेट करें
+st.set_page_config(
+    page_title="Gurukul Digital",           # ब्राउज़र टैब और होम स्क्रीन पर दिखने वाला नाम
+    page_icon="https://raw.githubusercontent.com/Nitesh-gurukul/gurukul/main/logo.png", # आपका असली लोगो आइकॉन
+    layout="wide"
+)
 
 # app.py me sabse upar yeh code jodein
 
@@ -78,9 +114,15 @@ else:
     st.sidebar.write(f"👋 नमस्ते, **{user_info['name']}**")
     st.sidebar.write(f"रोल: `{user_info['role'].upper()}`")
     
+    # आपके पुराने लॉगआउट कोड को इससे बदलें:
     if st.sidebar.button("Logout", key="logout_btn"):
         st.session_state.logged_in = False
         st.session_state.user_info = None
+        
+        # यहाँ हमने स्ट्रीमलिट की कुकी मेमोरी को डिलीट करने का कोड जोड़ दिया
+        if hasattr(st, "logout"):
+            st.logout()
+            
         st.rerun()
         
     # ==========================================
