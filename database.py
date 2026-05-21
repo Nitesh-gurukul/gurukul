@@ -187,3 +187,16 @@ def get_student_doubts(username):
 
 # पक्का करें कि फाइल लोड होते ही टेबल बन जाए
 create_doubt_table()
+
+def get_user_by_username(username):
+    import sqlite3
+    conn = sqlite3.connect('users.db')
+    c = conn.cursor()
+    try:
+        c.execute("SELECT username, name, role, class, subjects, status, mobile FROM users WHERE username = ?", (username,))
+        return c.fetchone()
+    except Exception as e:
+        print(e)
+        return None
+    finally:
+        conn.close()
