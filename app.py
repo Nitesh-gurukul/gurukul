@@ -1,34 +1,59 @@
 import streamlit as st
 import auth
 import database
-import streamlit as st
-import database
+import streamlit.components.v1 as components
 
-# =====================================================================
-# 🎯 यहाँ से नया कोड जोड़ें (इसे ढूंढने की ज़रूरत नहीं, सीधे पेस्ट करें)
-# =====================================================================
+# 🎯 ब्राउज़र मेमोरी में यूजर डेटा सेव करने का नया आसान फंक्शन
+def save_user_to_browser(username):
+    components.html(f"""
+    <script>
+        localStorage.setItem("gurukul_user", "{username}");
+    </script>
+    """, height=0, width=0)
+    
+# --- 🔐 फुल-प्रूफ ऑटो लॉगिन सिस्टम ---
 
-# 1. अगर सेशन स्टेट में 'user' नहीं है, तो उसे यहाँ बना देते हैं
-if 'user' not in st.session_state:
-    st.session_state['user'] = None
+# 1. सेशन स्टेट सेट करें
+if 'logged_in' not in st.session_state:
+    st.session_state.logged_in = False
+if 'user_info' not in st.session_state:
+    st.session_state.user_info = None
 
-# 2. रिफ्रेश होने पर ऑटो-लॉगिन करने का लॉजिक
-if st.session_state['user'] is None and hasattr(st, "experimental_user"):
-    client_user = st.experimental_user
-    if client_user and client_user.get("email"):
-        # ईमेल से यूजरनेम निकालना
-        extracted_username = client_user["email"].split("@")[0]
-        # डेटाबेस से पूरी जानकारी निकालना
-        db_user = database.get_user_by_username(extracted_username)
-        if db_user:
-            u_username, u_name, u_role, u_class, u_subjects, u_status, u_mobile = db_user
-            if u_status == 'active':
-                st.session_state['user'] = {
-                    "username": u_username,
-                    "name": u_name,
-                    "role": u_role,
-                    "class": u_class
-                }
+# 2. ब्राउज़र मेमोरी से ऑटो-लॉगिन डेटा पढ़ने के लिए एक छिपा हुआ इनपुट ट्रिगर
+# (यह जावास्क्रिप्ट स्ट्रीमलिट को बताएगी कि कौन सा यूजर पहले से लॉगिन है)
+auto_user = st.text_input("auto_user_trigger", value="", type="password", label_visibility="collapsed")
+
+js_check = f"""
+<script>
+    const savedUser = localStorage.getItem("gurukul_user");
+    if (savedUser && "{auto_user}" === "") {{
+        const inputs = window.parent.document.querySelectorAll('input[type="password"]');
+        for (let input of inputs) {{
+            if (input.getAttribute("aria-label") === "auto_user_trigger") {{
+                input.value = savedUser;
+                input.dispatchEvent(new Event('input', {{ bubbles: true }}));
+                break;
+            }}
+        }}
+    }}
+</script>
+"""
+components.html(js_check, height=0, width=0)
+
+# 3. अगर ब्राउज़र मेमोरी में यूजर मिला, तो उसे ऑटो-लॉगिन करें
+if auto_user != "" and not st.session_state.logged_in:
+    db_user = database.get_user_by_username(auto_user)
+    if db_user:
+        u_username, u_name, u_role, u_class, u_subjects, u_status, u_mobile = db_user
+        if u_status == 'active':
+            st.session_state.logged_in = True
+            st.session_state.user_info = {
+                "username": u_username,
+                "name": u_name,
+                "role": u_role,
+                "class": u_class
+            }
+            st.rerun()
 
 # =====================================================================
 # 👆 यहाँ तक नया कोड पेस्ट करने के बाद आपका पुराना कोड वैसे ही रहेगा
@@ -82,6 +107,7 @@ if not st.session_state.logged_in:
             user, message = auth.login_user(username, password)
             if user:
                 st.session_state.logged_in = True
+                save_user_to_browser(username)
                 st.session_state.user_info = user
                 st.success(message)
                 st.rerun()
