@@ -3,17 +3,24 @@ import database
 import pandas as pd
 from datetime import datetime
 
-# --- ⚙️ वेबसाइट कॉन्फ़िगरेशन ---
+# --- 🌐 वेबसाइट कॉन्फ़िगरेशन ---
 st.set_page_config(page_title="Digital Pathshala", page_icon="🎓", layout="wide")
+
+# 📱 1. साइडबार (Sidebar) में लोगो और नाम दिखाने के लिए:
+try:
+    st.sidebar.image("logo.png", use_container_width=True)
+except:
+    # अगर किसी वजह से इमेज लोड न हो, तो टेक्स्ट नाम दिखेगा एरर नहीं आएगा
+    st.sidebar.markdown("<h2 style='text-align: center; color: #1E3A8A;'>🎓 डिजिटल पाठशाला</h2>", unsafe_allow_html=True)
 
 # --- 🎨 प्रीमियम लुक CSS ---
 st.markdown("""
-    <style>
+<style>
     #MainMenu, footer, header, .stDeployButton {visibility: hidden; display:none;}
     .main-title { font-size: 38px; font-weight: bold; color: #1E3A8A; text-align: center; margin-bottom: 5px; }
     .sub-title { font-size: 18px; color: #6B7280; text-align: center; margin-bottom: 25px; }
-    </style>
-    """, unsafe_allow_html=True)
+</style>
+""", unsafe_allow_html=True)
 
 if 'logged_in' not in st.session_state: st.session_state.logged_in = False
 if 'user_info' not in st.session_state: st.session_state.user_info = None
