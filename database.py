@@ -1,29 +1,32 @@
 import sqlite3
+import pandas as pd
+from datetime import datetime
 
 def get_connection():
-    # डेटाबेस से कनेक्ट करने के लिए (फाइल अपने आप बन जाएगी)
-    conn = sqlite3.connect("study_app.db", check_same_thread=False)
-    return conn
+    return sqlite3.connect("gurukul.db", check_same_thread=False)
 
 def create_tables():
     conn = get_connection()
     cursor = conn.cursor()
     
-    # 1. Users Table (इसमें मोबाइल नंबर और स्टेटस सब शामिल है)
+    # 1. Users Table (छात्र और टीचर दोनों के लिए)
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS users (
             username TEXT PRIMARY KEY,
             password TEXT NOT NULL,
             name TEXT NOT NULL,
-            role TEXT NOT NULL,          -- 'super_admin', 'admin', 'student'
-            assigned_class TEXT,         -- 'Class 7', 'Class 8', आदि
-            allowed_subjects TEXT,       -- 'Maths,Science'
-            status TEXT DEFAULT 'pending', -- 'pending', 'active', 'blocked'
-            mobile TEXT                  -- छात्र/अभिभावक का संपर्क नंबर
+            role TEXT NOT NULL,          
+            assigned_class TEXT,         
+            allowed_subjects TEXT,       
+            status TEXT DEFAULT 'pending', 
+            mobile TEXT,                  
+            board TEXT,                  
+            school TEXT,
+	    join_date TEXT                 
         )
     ''')
     
-    # 2. Materials Table (कोर्स मटेरियल, PDF बाइट्स और वीडियो लिंक्स के लिए)
+    # 2. Materials Table (स्टडी मटेरियल के लिए)
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS materials (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -31,33 +34,98 @@ def create_tables():
             subject_name TEXT NOT NULL,
             topic_title TEXT NOT NULL,
             pdf_name TEXT,
-            pdf_data BLOB,              -- PDF फाइल को डेटाबेस में सेव करने के लिए
-            video_url TEXT              -- यूट्यूब या वीडियो लिंक
+            pdf_data BLOB,              
+            video_url TEXT,
+            uploaded_by TEXT DEFAULT 'admin'
         )
     ''')
     
-    # एक डिफॉल्ट Super Admin बनाना (Username: admin, Password: admin123)
+    # 3. Portal Info Table (नियम और स्टडी प्लान)
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS portal_info 
+        (id INTEGER PRIMARY KEY, rules TEXT, planning TEXT)
+    ''')
+    
+    # 4. Notices Table (नोटिस बोर्ड)
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS portal_notices 
+        (id INTEGER PRIMARY KEY AUTOINCREMENT, type TEXT, title TEXT, link TEXT, date TEXT)
+    ''')
+    
+    # 5. Activity Logs Table (एनालिटिक्स और ट्रैफिक ट्रैकिंग)
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS activity_logs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT,
+            city TEXT,
+            school TEXT,                 
+            login_date TEXT,
+            login_month TEXT
+        )
+    ''')
+    
+    # 🎯 डाउट्स टेबल का बिल्कुल सही और नया स्ट्रक्चर
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS doubts (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            student_username TEXT,
+            student_name TEXT,
+            student_class TEXT,
+            doubt_text TEXT,
+            reply_text TEXT,
+            replied_by TEXT,
+            date_asked TEXT,
+            img_name TEXT,       -- ✅ यह नया कॉलम होना जरूरी है
+            img_data BLOB        -- ✅ यह नया कॉलम होना जरूरी है
+        )
+    ''')
+    
+    # डिफ़ॉल्ट सुपर एडमिन सेटअप
     cursor.execute("SELECT * FROM users WHERE role = 'super_admin'")
     if not cursor.fetchone():
         cursor.execute('''
-            INSERT INTO users (username, password, name, role, status, mobile)
-            VALUES ('admin', 'admin123', 'Main Owner', 'super_admin', 'active', '9999999999')
+            INSERT INTO users (username, password, name, role, status, mobile, school, board)
+            VALUES ('admin', 'admin123', 'Main Owner', 'super_admin', 'active', '9999999999', 'Admin HQ', 'All')
         ''')
+        
+    if cursor.execute("SELECT COUNT(*) FROM portal_info").fetchone()[0] == 0:
+        cursor.execute("INSERT INTO portal_info (id, rules, planning) VALUES (1, 'नियमित क्लास में आएं।', 'नया स्टडी प्लान लाइव है।')")
     
-    # पुरानी टेबल में मोबाइल नंबर कॉलम जोड़ने का सेफ्टी कोड
-    try:
-        cursor.execute("ALTER TABLE users ADD COLUMN mobile TEXT")
-    except sqlite3.OperationalError:
-        pass
-
     conn.commit()
     conn.close()
 
-# यूजर मैनेजमेंट फंक्शन्स
-def get_all_users():
+def add_user(username, name, password, role='student', student_class='', mobile='', subject='', board='', school=''):
+    try:
+        conn = get_connection()
+        c = conn.cursor()
+        # 📅 आज की तारीख (जैसे 24-May-2026)
+        today_str = datetime.today().strftime('%d-%b-%Y') 
+        
+        # 🔍 यहाँ पूरे 11 कॉलम और 11 '?' एकदम परफेक्ट सेट हैं
+        c.execute("""INSERT INTO users (username, name, password, role, assigned_class, allowed_subjects, status, mobile, board, school, join_date) 
+                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""", 
+                  (username, name, password, role, student_class, subject, 'pending', mobile, board, school, today_str))
+        conn.commit()
+        conn.close()
+        return True, "सफलतापूर्वक जोड़ा गया!"
+    except Exception as e:
+        return False, f"त्रुटि: {str(e)}"
+
+def get_user_by_username(username):
+    conn = get_connection()
+    c = conn.cursor()
+    try:
+        c.execute("SELECT username, name, password, role, assigned_class, allowed_subjects, status, mobile, board, school FROM users WHERE username = ?", (username,))
+        return c.fetchone()
+    except:
+        return None
+    finally:
+        conn.close()
+
+def get_all_users_by_role(role_name):
     conn = get_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT username, name, role, assigned_class, allowed_subjects, status, mobile FROM users WHERE role != 'super_admin'")
+    cursor.execute("SELECT username, name, role, assigned_class, allowed_subjects, status, mobile, board, school FROM users WHERE role = ?", (role_name,))
     users = cursor.fetchall()
     conn.close()
     return users
@@ -76,17 +144,6 @@ def delete_user(username):
     conn.commit()
     conn.close()
 
-def update_user_access(username, assigned_class, allowed_subjects):
-    conn = get_connection()
-    cursor = conn.cursor()
-    cursor.execute('''
-        UPDATE users 
-        SET assigned_class = ?, allowed_subjects = ? 
-        WHERE username = ?
-    ''', (assigned_class, allowed_subjects, username))
-    conn.commit()
-    conn.close()
-
 def reset_user_password(username, new_password):
     conn = get_connection()
     cursor = conn.cursor()
@@ -94,33 +151,21 @@ def reset_user_password(username, new_password):
     conn.commit()
     conn.close()
 
-# कोर्स मटेरियल वाले फंक्शन्स
-def add_material(class_name, subject_name, topic_title, pdf_name=None, pdf_data=None, video_url=None):
+def add_material(class_name, subject_name, topic_title, pdf_name=None, pdf_data=None, video_url=None, uploaded_by='admin'):
     conn = get_connection()
     cursor = conn.cursor()
-    cursor.execute('''
-        INSERT INTO materials (class_name, subject_name, topic_title, pdf_name, pdf_data, video_url)
-        VALUES (?, ?, ?, ?, ?, ?)
-    ''', (class_name, subject_name, topic_title, pdf_name, pdf_data, video_url))
+    cursor.execute('''INSERT INTO materials (class_name, subject_name, topic_title, pdf_name, pdf_data, video_url, uploaded_by)
+                      VALUES (?, ?, ?, ?, ?, ?, ?)''', (class_name, subject_name, topic_title, pdf_name, pdf_data, video_url, uploaded_by))
     conn.commit()
     conn.close()
 
-def get_materials_by_access(class_name, subject_name):
+def get_materials_by_class_subject(class_name, subject_name):
     conn = get_connection()
     cursor = conn.cursor()
-    cursor.execute('''
-        SELECT id, topic_title, pdf_name, pdf_data, video_url 
-        FROM materials 
-        WHERE class_name = ? AND subject_name = ?
-    ''', (class_name, subject_name))
-    materials = cursor.fetchall()
+    cursor.execute('SELECT id, topic_title, pdf_name, pdf_data, video_url, uploaded_by FROM materials WHERE class_name = ? AND subject_name = ?', (class_name, subject_name))
+    res = cursor.fetchall()
     conn.close()
-    return materials
-
-# फाइल रन होते ही टेबल्स ऑटो-क्रिएट हो जाएं
-create_tables()
-
-# database.py के सबसे नीचे इसे पेस्ट करें:
+    return res
 
 def delete_material(material_id):
     conn = get_connection()
@@ -129,74 +174,86 @@ def delete_material(material_id):
     conn.commit()
     conn.close()
 
-# database.py के सबसे नीचे इसे पेस्ट करें:
-
-def create_doubt_table():
+def get_portal_info():
     conn = get_connection()
-    cursor = conn.cursor()
-    # डाउट्स टेबल: इसमें छात्र का नाम, सवाल का टेक्स्ट, फोटो (BLOB) और एडमिन का रिप्लाई सेव होगा
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS doubts (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            student_username TEXT NOT NULL,
-            student_name TEXT NOT NULL,
-            doubt_text TEXT,
-            image_name TEXT,
-            image_data BLOB,            -- सवाल की फोटो को सुरक्षित रखने के लिए
-            reply_text TEXT,            -- एडमिन का जवाब
-            status TEXT DEFAULT 'pending' -- 'pending' या 'resolved'
-        )
-    ''')
-    conn.commit()
-    conn.close()
-
-def add_doubt(username, name, doubt_text=None, img_name=None, img_bytes=None):
-    conn = get_connection()
-    cursor = conn.cursor()
-    cursor.execute('''
-        INSERT INTO doubts (student_username, student_name, doubt_text, image_name, image_data)
-        VALUES (?, ?, ?, ?, ?)
-    ''', (username, name, doubt_text, img_name, img_bytes))
-    conn.commit()
-    conn.close()
-
-def get_pending_doubts():
-    conn = get_connection()
-    cursor = conn.cursor()
-    # शिक्षकों को दिखाने के लिए केवल पेंडिंग डाउट्स लाना
-    cursor.execute("SELECT id, student_name, doubt_text, image_name, image_data FROM doubts WHERE status = 'pending'")
-    doubts = cursor.fetchall()
-    conn.close()
-    return doubts
-
-def reply_to_doubt(doubt_id, reply_text):
-    conn = get_connection()
-    cursor = conn.cursor()
-    cursor.execute("UPDATE doubts SET reply_text = ?, status = 'resolved' WHERE id = ?", (reply_text, doubt_id))
-    conn.commit()
-    conn.close()
-
-def get_student_doubts(username):
-    conn = get_connection()
-    cursor = conn.cursor()
-    # किसी एक छात्र को उसके खुद के पूछे गए सारे सवाल और उनके जवाब दिखाना
-    cursor.execute("SELECT doubt_text, image_name, image_data, reply_text, status FROM doubts WHERE student_username = ?", (username,))
-    doubts = cursor.fetchall()
-    conn.close()
-    return doubts
-
-# पक्का करें कि फाइल लोड होते ही टेबल बन जाए
-create_doubt_table()
-
-def get_user_by_username(username):
-    import sqlite3
-    conn = sqlite3.connect('users.db')
     c = conn.cursor()
-    try:
-        c.execute("SELECT username, name, role, class, subjects, status, mobile FROM users WHERE username = ?", (username,))
-        return c.fetchone()
-    except Exception as e:
-        print(e)
-        return None
-    finally:
-        conn.close()
+    c.execute("SELECT rules, planning FROM portal_info WHERE id=1")
+    data = c.fetchone()
+    conn.close()
+    return data if data else ("नियम उपलब्ध नहीं हैं", "प्लानिंग उपलब्ध नहीं है")
+
+def update_portal_info(rules, planning):
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute("UPDATE portal_info SET rules=?, planning=? WHERE id=1", (rules, planning))
+    conn.commit()
+    conn.close()
+
+def get_all_notices():
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute("SELECT id, type, title, link, date FROM portal_notices ORDER BY id DESC")
+    data = c.fetchall()
+    conn.close()
+    return data
+
+def add_portal_notice(ntype, title, link, date):
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute("INSERT INTO portal_notices (type, title, link, date) VALUES (?, ?, ?, ?)", (ntype, title, link, date))
+    conn.commit()
+    conn.close()
+
+def add_doubt(student_username, student_name, student_class, doubt_text, img_name=None, img_data=None):
+    conn = get_connection()
+    cursor = conn.cursor()
+    today = datetime.today().strftime('%d-%b-%Y')
+    cursor.execute("""INSERT INTO doubts (student_username, student_name, student_class, doubt_text, date_asked, img_name, img_data) 
+                      VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                   (student_username, student_name, student_class, doubt_text, today, img_name, img_data))
+    conn.commit()
+    conn.close()
+
+def get_doubts_by_class(class_name):
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT id, student_name, student_class, doubt_text, reply_text, img_name, img_data FROM doubts WHERE student_class = ?", (class_name,))
+    res = cursor.fetchall()
+    conn.close()
+    return res
+
+def get_doubts_by_student(student_username):
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT id, doubt_text, reply_text, replied_by, img_name, img_data FROM doubts WHERE student_username = ?", (student_username,))
+    res = cursor.fetchall()
+    conn.close()
+    return res
+
+def reply_to_doubt(doubt_id, reply_text, replied_by):
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("UPDATE doubts SET reply_text = ?, replied_by = ? WHERE id = ?", (reply_text, replied_by, doubt_id))
+    conn.commit()
+    conn.close()
+
+def log_user_activity(username, city='Patna', school='Not Specified'):
+    conn = get_connection()
+    cursor = conn.cursor()
+    today = datetime.today().strftime('%Y-%m-%d')
+    current_month = datetime.today().strftime('%B-%Y')
+    cursor.execute("INSERT INTO activity_logs (username, city, school, login_date, login_month) VALUES (?, ?, ?, ?, ?)",
+                   (username, city, school, today, current_month))
+    conn.commit()
+    conn.close()
+
+def get_analytics_data():
+    conn = get_connection()
+    df_city = pd.read_sql_query("SELECT city, COUNT(*) as active_users FROM activity_logs WHERE city != '' GROUP BY city ORDER BY active_users DESC", conn)
+    df_school = pd.read_sql_query("SELECT school, COUNT(*) as student_count FROM activity_logs WHERE school != '' GROUP BY school ORDER BY student_count DESC", conn)
+    df_month = pd.read_sql_query("SELECT login_month, COUNT(*) as visits FROM activity_logs GROUP BY login_month", conn)
+    df_daily = pd.read_sql_query("SELECT login_date, COUNT(*) as daily_visits FROM activity_logs GROUP BY login_date ORDER BY login_date DESC LIMIT 7", conn)
+    conn.close()
+    return df_city, df_school, df_month, df_daily
+
+create_tables()
