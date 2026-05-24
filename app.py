@@ -1,417 +1,445 @@
 import streamlit as st
-import auth
 import database
-import streamlit.components.v1 as components
+import pandas as pd
+from datetime import datetime
 
-# 🎯 ब्राउज़र मेमोरी में यूजर डेटा सेव करने का नया आसान फंक्शन
-def save_user_to_browser(username):
-    components.html(f"""
-    <script>
-        localStorage.setItem("gurukul_user", "{username}");
-    </script>
-    """, height=0, width=0)
-    
-# --- 🔐 फुल-प्रूफ ऑटो लॉगिन सिस्टम ---
+# --- ⚙️ वेबसाइट कॉन्फ़िगरेशन ---
+st.set_page_config(page_title="Digital Pathshala", page_icon="🎓", layout="wide")
 
-# 1. सेशन स्टेट सेट करें
-if 'logged_in' not in st.session_state:
-    st.session_state.logged_in = False
-if 'user_info' not in st.session_state:
-    st.session_state.user_info = None
-
-# 2. ब्राउज़र मेमोरी से ऑटो-लॉगिन डेटा पढ़ने के लिए एक छिपा हुआ इनपुट ट्रिगर
-# (यह जावास्क्रिप्ट स्ट्रीमलिट को बताएगी कि कौन सा यूजर पहले से लॉगिन है)
-auto_user = st.text_input("auto_user_trigger", value="", type="password", label_visibility="collapsed")
-
-js_check = f"""
-<script>
-    const savedUser = localStorage.getItem("gurukul_user");
-    if (savedUser && "{auto_user}" === "") {{
-        const inputs = window.parent.document.querySelectorAll('input[type="password"]');
-        for (let input of inputs) {{
-            if (input.getAttribute("aria-label") === "auto_user_trigger") {{
-                input.value = savedUser;
-                input.dispatchEvent(new Event('input', {{ bubbles: true }}));
-                break;
-            }}
-        }}
-    }}
-</script>
-"""
-components.html(js_check, height=0, width=0)
-
-# 3. अगर ब्राउज़र मेमोरी में यूजर मिला, तो उसे ऑटो-लॉगिन करें
-if auto_user != "" and not st.session_state.logged_in:
-    db_user = database.get_user_by_username(auto_user)
-    if db_user:
-        u_username, u_name, u_role, u_class, u_subjects, u_status, u_mobile = db_user
-        if u_status == 'active':
-            st.session_state.logged_in = True
-            st.session_state.user_info = {
-                "username": u_username,
-                "name": u_name,
-                "role": u_role,
-                "class": u_class
-            }
-            st.rerun()
-
-# =====================================================================
-# 👆 यहाँ तक नया कोड पेस्ट करने के बाद आपका पुराना कोड वैसे ही रहेगा
-# =====================================================================
-
-# app.py में सबसे ऊपर इसे अपडेट करें
-st.set_page_config(
-    page_title="Gurukul Digital",           # ब्राउज़र टैब और होम स्क्रीन पर दिखने वाला नाम
-    page_icon="https://raw.githubusercontent.com/Nitesh-gurukul/gurukul/main/logo.png", # आपका असली लोगो आइकॉन
-    layout="wide"
-)
-
-# app.py me sabse upar yeh code jodein
-
+# --- 🎨 प्रीमियम लुक CSS ---
 st.markdown("""
     <style>
-        #MainMenu {visibility: hidden;}
-        footer {visibility: hidden;}
-        header {visibility: hidden;}
+    #MainMenu, footer, header, .stDeployButton {visibility: hidden; display:none;}
+    .main-title { font-size: 38px; font-weight: bold; color: #1E3A8A; text-align: center; margin-bottom: 5px; }
+    .sub-title { font-size: 18px; color: #6B7280; text-align: center; margin-bottom: 25px; }
     </style>
-""", unsafe_allow_html=True)
+    """, unsafe_allow_html=True)
 
-# 🎯 ऐप के फ्रंट पेज पर आपका नया लोगो दिखाने के लिए:
+if 'logged_in' not in st.session_state: st.session_state.logged_in = False
+if 'user_info' not in st.session_state: st.session_state.user_info = None
 
-# आपके गिटहब से लोगो का डायरेक्ट लिंक
-logo_url = "https://raw.githubusercontent.com/Nitesh-gurukul/gurukul/main/logo.png"
-
-# लोगो को स्क्रीन पर दिखाने के लिए (width आप अपने हिसाब से 100, 150 या 200 कर सकते हैं)
-st.image(logo_url, width=180)
-
-# 2. Main Screen ki badi Heading ko badlein
-st.title("📚 Gurukul Digital (Class 7-10)")
-st.subheader("घर बैठे सुरक्षित और आसान पढ़ाई")
-
-# सेशन स्टेट्स ट्रैकिंग
-if "logged_in" not in st.session_state:
-    st.session_state.logged_in = False
-    st.session_state.user_info = None
-
-# --- लॉगिन और साइनअप स्क्रीन ---
-if not st.session_state.logged_in:
-    choice = st.radio("विकल्प चुनें:", ["लॉगिन (Login)", "नया रजिस्ट्रेशन (Sign Up)"])
-    
-    if choice == "लॉगिन (Login)":
-        st.write("### अपने अकाउंट में लॉगिन करें")
-        st.caption("ℹ️ यदि आप पासवर्ड भूल गए हैं, तो रीसेट कराने के लिए एडमिन से संपर्क करें।")
-        username = st.text_input("यूजरनेम (Username)", key="log_user")
-        password = st.text_input("पासवर्ड (Password)", type="password", key="log_pass")
-        
-        if st.button("Login", key="log_btn"):
-            user, message = auth.login_user(username, password)
-            if user:
-                st.session_state.logged_in = True
-                save_user_to_browser(username)
-                st.session_state.user_info = user
-                st.success(message)
-                st.rerun()
-            else:
-                st.error(message)
-                
-    elif choice == "नया रजिस्ट्रेशन (Sign Up)":
-        st.write("### नया छात्र अकाउंट बनाएं")
-        name = st.text_input("आपका पूरा नाम (Full Name)", key="reg_name")
-        mobile = st.text_input("मोबाइल / व्हाट्सऐप नंबर (10 अंक)", max_chars=10, key="reg_mob")
-        username = st.text_input("एक यूनिक यूजरनेम चुनें", key="reg_user")
-        password = st.text_input("एक मजबूत पासवर्ड", type="password", key="reg_pass")
-        student_class = st.selectbox("अपनी कक्षा चुनें", ["Class 7", "Class 8", "Class 9", "Class 10"], key="reg_cls")
-        
-        if st.button("Register", key="reg_btn"):
-            if name and mobile and username and password:
-                success, message = auth.register_user(username, password, name, 'student', student_class, "", mobile)
-                if success:
-                    st.success(message)
-                else:
-                    st.error(message)
-            else:
-                st.warning("कृपया सभी फील्ड्स को भरें!")
-
-else:
-    # --- लॉगिन होने के बाद का डैशबोर्ड ---
+# ==========================================
+# केस 1: लॉगिन के बाद का डैशबोर्ड व्यू
+# ==========================================
+if st.session_state.logged_in:
     user_info = st.session_state.user_info
-    st.sidebar.image(logo_url, use_container_width=True)
-
-    st.sidebar.write(f"👋 नमस्ते, **{user_info['name']}**")
-    st.sidebar.write(f"रोल: `{user_info['role'].upper()}`")
     
-    # आपके पुराने लॉगआउट कोड को इससे बदलें:
-    if st.sidebar.button("Logout", key="logout_btn"):
+    col_head, col_logout = st.columns([8, 2])
+    col_head.markdown(f"### 🎯 स्वागत है, {user_info['name']} (`{user_info['role'].upper()}`)")
+    if col_logout.button("🚪 लॉगआउट (Sign Out)", key="top_log", width='stretch', type="primary"):
         st.session_state.logged_in = False
         st.session_state.user_info = None
-        
-        # यहाँ हमने स्ट्रीमलिट की कुकी मेमोरी को डिलीट करने का कोड जोड़ दिया
-        if hasattr(st, "logout"):
-            st.logout()
-            
         st.rerun()
-        
-    # ==========================================
-    # 1. SUPER ADMIN CONTROL PANEL
-    # ==========================================
-    if user_info['role'] == 'super_admin':
-        st.write("## 👑 Super Admin Control Panel")
-        
-        tab1, tab2 = st.tabs(["👥 यूजर मैनेजमेंट (Students/Admins)", "➕ नया एडमिन जोड़ें"])
-        
-        with tab1:
-            st.write("### सभी रजिस्टर्ड यूजर्स की सूची")
-            all_users = database.get_all_users()
             
-            if not all_users:
-                st.info("अभी तक कोई नया यूजर रजिस्टर नहीं हुआ है।")
-            else:
-                for row in all_users:
-                    u_username, u_name, u_role, u_class, u_subjects, u_status, u_mobile = row
-                    
-                    with st.container():
-                        st.markdown(f"**नाम:** {u_name} | **📞 मोबाइल:** `{u_mobile if u_mobile else 'N/A'}`")
-                        st.markdown(f"**यूजरनेम:** `{u_username}` | **रोल:** `{u_role.upper()}`")
-                        st.write(f"कक्षा: {u_class} | विषय एक्सेस: {u_subjects if u_subjects else 'None'}")
-                        
-                        if u_status == 'pending':
-                            st.warning(f"स्टेटस: PENDING (लॉगिन बंद है)")
-                        elif u_status == 'active':
-                            st.success(f"स्टेटस: ACTIVE (लॉगिन चालू है)")
-                        elif u_status == 'blocked':
-                            st.error(f"स्टेटस: BLOCKED (अकाउंट ब्लॉक है)")
-                            
-                        col1, col2, col3 = st.columns(3)
-                        
-                        if u_status == 'pending' or u_status == 'blocked':
-                            if col1.button("✅ Approve / Unblock", key=f"app_{u_username}"):
-                                database.update_user_status(u_username, 'active')
-                                st.success(f"{u_username} एक्टिव हो गया!")
-                                st.rerun()
-                                
-                        if u_status == 'active':
-                            if col1.button("🚫 Temporary Block", key=f"blk_{u_username}"):
-                                database.update_user_status(u_username, 'blocked')
-                                st.error(f"{u_username} ब्लॉक हो गया!")
-                                st.rerun()
-                                
-                        if col2.button("❌ Remove Permanent", key=f"rem_{u_username}"):
-                            database.delete_user(u_username)
-                            st.error(f"{u_username} डिलीट हो गया!")
-                            st.rerun()
-                            
-                        with st.expander("📝 क्लास और सब्जेक्ट एक्सेस बदलें"):
-                            new_class = st.selectbox("क्लास बदलें", ["Class 7", "Class 8", "Class 9", "Class 10"], index=["Class 7", "Class 8", "Class 9", "Class 10"].index(u_class) if u_class else 0, key=f"cls_sel_{u_username}")
-                            
-                            available_subjects = ["Maths", "Physics", "Chemistry", "Biology", "English", "Social Science"]
-                            default_sub = [s.strip() for s in u_subjects.split(",")] if u_subjects else []
-                            default_sub = [s for s in default_sub if s in available_subjects]
-                            
-                            new_subs = st.multiselect("विषय चुनें", available_subjects, default=default_sub, key=f"sub_sel_{u_username}")
-                            
-                            if st.button("एक्सेस अपडेट करें", key=f"up_acc_{u_username}"):
-                                sub_string = ",".join(new_subs)
-                                database.update_user_access(u_username, new_class, sub_string)
-                                st.success("एक्सेस अपडेट हो गया!")
-                                st.rerun()
-                                
-                        with st.expander("🔑 पासवर्ड रीसेट करें (Reset Password)"):
-                            new_pass = st.text_input("नया पासवर्ड डालें", type="password", key=f"pass_{u_username}")
-                            if st.button("पासवर्ड बदलें", key=f"btn_pass_{u_username}"):
-                                if new_pass:
-                                    database.reset_user_password(u_username, new_pass)
-                                    st.success(f"🔑 पासवर्ड सफलतापूर्वक बदल दिया गया है!")
-                                else:
-                                    st.warning("कृपया पासवर्ड टाइप करें!")
-                                    
-                    st.markdown("---")
-                    
-        with tab2:
-            st.write("### नया एडमिन (शिक्षक) अकाउंट बनाएं")
-            adm_name = st.text_input("एडमिन का नाम", key="new_adm_name")
-            adm_username = st.text_input("एडमिन यूजरनेम (यूनिक)", key="new_adm_user")
-            adm_password = st.text_input("एडमिन पासवर्ड", type="password", key="new_adm_pass")
-            
-            # app.py के tab2 के अंदर केवल इस हिस्से को अपडेट करें:
+    st.markdown("---")
 
-            if st.button("Create Admin", key="new_adm_btn"):
-                if adm_name and adm_username and adm_password:
-                    # यहाँ हमने क्लास की जगह "" और सब्जेक्ट की जगह "" भेजा है ताकि एरर न आए
-                    success, message = auth.register_user(adm_username, adm_password, adm_name, 'admin', "", "", "")
-                    if success:
-                        st.success(f"🎉 Admin {adm_username} सफलतापूर्वक बन गया और एक्टिव है!")
-                        st.rerun()
-                    else:
-                        st.error(message)
-                else:
-                    st.warning("कृपया सभी फील्ड्स भरें!")
-
-    # ==========================================
-    # 2. ADMIN / TEACHER DASHBOARD (मटीरियल अपलोड और डिलीट पैनल)
-    # ==========================================
-    elif user_info['role'] == 'admin':
-        st.write("## 👨‍🏫 Admin / Teacher Dashboard")
+    # 🛠️ [A] सुपर एडमिन का मुख्य पैनल
+    if user_info['role'].lower() in ['super_admin', 'admin', 'main owner']:
+        st.title("🛠️ मास्टर एडमिन डैशबोर्ड")
         
-        tab_upload, tab_view, tab_doubts = st.tabs(["➕ नया मटीरियल अपलोड करें", "📚 अपलोडेड मटीरियल देखें", "🙋‍♂️ छात्रों के डाउट्स (Doubts)"])
+        # 🎯 यहाँ '🔐 सुरक्षा' नाम का नया टैब जोड़ दिया गया है
+        t_not, t_stu, t_tea, t_mat, t_lnk, t_ana, t_pwd = st.tabs([
+            "📢 नोटिस", "👥 छात्र", "👨‍🏫 टीचर", "📚 नोट्स", "🔗 लिंक्स", "📊 एनालिटिक्स", "🔐 सुरक्षा"
+        ])
         
-        with tab_upload:
-            st.write("### स्टडी मटीरियल फॉर्म")
-            c_class = st.selectbox("किस क्लास के लिए है?", ["Class 7", "Class 8", "Class 9", "Class 10"], key="adm_cls")
-            c_sub = st.selectbox("विषय (Subject) चुनें", ["Maths", "Physics", "Chemistry", "Biology", "English", "Social Science"], key="adm_sub")
-            c_title = st.text_input("टॉपिक या चैप्टर का नाम", placeholder="जैसे: Chapter 1 - Number System", key="adm_tit")
-            
-            uploaded_pdf = st.file_uploader("चैप्टर की PDF फाइल अपलोड करें", type=["pdf"], key="adm_pdf")
-            c_video = st.text_input("शॉर्ट वीडियो का URL / Link", placeholder="https://youtube.com/shorts/...", key="adm_vid")
-            
-            if st.button("🚀 मटीरियल ऐप पर लाइव करें", key="adm_pub_btn"):
-                if c_title and (uploaded_pdf or c_video):
-                    pdf_name, pdf_bytes = None, None
-                    if uploaded_pdf is not None:
-                        pdf_name = uploaded_pdf.name
-                        pdf_bytes = uploaded_pdf.read()
-                        
-                    database.add_material(c_class, c_sub, c_title, pdf_name, pdf_bytes, c_video)
-                    st.success(f"🎉 मटीरियल सफलतापूर्वक लाइव हो गया!")
-                    st.rerun()
-                else:
-                    st.warning("कृपया टॉपिक का नाम और कम से कम एक चीज़ (PDF या Video Link) ज़रूर डालें!")
-                    
-        with tab_view:
-            st.write("### आपके द्वारा अपलोडेड मटीरियल")
-            v_class = st.selectbox("क्浪स चुनें", ["Class 7", "Class 8", "Class 9", "Class 10"], key="v_cls")
-            v_sub = st.selectbox("विषय चुनें", ["Maths", "Science", "English", "Social Science"], key="v_sub")
-            
-        # app.py में Teacher Dashboard के 'with tab_view:' ब्लॉक के ठीक नीचे (उसी की सीध में) इसे पेस्ट करें:
-
-        with tab_doubts:
-            st.write("### ❓ छात्रों द्वारा पूछे गए सवाल")
-            pending_doubts = database.get_pending_doubts()
-            
-            if not pending_doubts:
-                st.success("🎉 सभी डाउट्स सॉल्व हो चुके हैं! कोई पेंडिंग सवाल नहीं है।")
-            else:
-                for dbt in pending_doubts:
-                    d_id, d_st_name, d_text, d_img_name, d_img_bytes = dbt
-                    
-                    with st.container():
-                        st.markdown(f"**छात्र का नाम:** {d_st_name}")
-                        if d_text:
-                            st.info(f"💬 सवाल: {d_text}")
-                        if d_img_bytes:
-                            st.image(d_img_bytes, caption=f"📄 अपलोडेड फोटो: {d_img_name}", use_container_width=True)
-                            
-                        # रिप्लाई देने के लिए इनपुट बॉक्स
-                        t_reply = st.text_area("अपना जवाब यहाँ लिखें (Reply):", key=f"rep_txt_{d_id}")
-                        if st.button("🚀 जवाब सबमिट करें", key=f"rep_btn_{d_id}"):
-                            if t_reply:
-                                database.reply_to_doubt(d_id, t_reply)
-                                st.success("जवाब सफलता पूर्वक भेज दिया गया है!")
-                                st.rerun()
-                            else:
-                                st.warning("कृपया जवाब टाइप करें!")
-                    st.markdown("---")
-            materials_list = database.get_materials_by_access(v_class, v_sub)
-            if not materials_list:
-                st.info(f"फिलहाल कोई मटीरियल अपलोड नहीं है।")
-            else:
-                for mat in materials_list:
-                    m_id, m_title, m_pdf_name, m_pdf_data, m_video = mat
-                    with st.expander(f"📖 {m_title}"):
-                        if m_pdf_name:
-                            st.write(f"📄 फाइल: {m_pdf_name}")
-                            st.download_button(label="📥 Download PDF", data=m_pdf_data, file_name=m_pdf_name, mime="application/pdf", key=f"dl_{m_id}")
-                        if m_video:
-                            st.write("📺 वीडियो लेक्चर:")
-                            try:
-                                st.video(m_video)
-                            except:
-                                st.write(f"🔗 लिंक खोलें: {m_video}")
-                        
-                        # ---- नया फीचर: गलती से डबल अपलोड हुए मटीरियल को डिलीट करने का बटन ----
-                        st.markdown("---")
-                        if st.button("🗑️ इस मटीरियल को डिलीट करें", key=f"del_mat_{m_id}"):
-                            database.delete_material(m_id)
-                            st.error(f"❌ मटीरियल '{m_title}' को डिलीट कर दिया गया है!")
-                            st.rerun()
-
-    # ==========================================
-    # 3. STUDENT DASHBOARD (छात्र पोर्टल - मटीरियल + डाउट सेक्शन)
-    # ==========================================
-    elif user_info['role'] == 'student':
-        st.write(f"## 🎓 छात्र पोर्टल (Student Dashboard)")
-        st.write(f"👋 नमस्ते, **{user_info['name']}** | कक्षा: `{user_info['class']}`")
+        with t_not:
+            st.subheader("📝 मुख्य नियम और स्टडी प्लान")
+            curr_rules, curr_plan = database.get_portal_info()
+            u_rules = st.text_area("📋 नियम:", value=curr_rules, height=100)
+            u_plan = st.text_area("📅 स्टडी प्लान:", value=curr_plan, height=100)
+            if st.button("📢 जानकारी लाइव करें"):
+                database.update_portal_info(u_rules, u_plan)
+                st.success("अपडेट सफल!")
         
-        # यहाँ हमने छात्र के लिए दो अलग टैब बना दिए हैं
-        st_tab1, st_tab2 = st.tabs(["📚 पढ़ाई (Study Material)", "🙋‍♂️ मेरा डाउट बॉक्स (Ask Doubt)"])
-        
-        with st_tab1:
-            allowed_subs = [s.strip() for s in user_info['subjects'].split(",") if s.strip()] if user_info['subjects'] else []
-            
-            if not allowed_subs:
-                st.warning("⚠️ आपको अभी तक सुपर एडमिन द्वारा कोई विषय (Subjects) असाइन नहीं किया गया है। कृपया फीस क्लियर करके एडमिन से संपर्क करें।")
-            else:
-                st.write("### 📚 आपके विषय (Your Assigned Subjects)")
-                selected_sub = st.selectbox("पढ़ने के लिए विषय चुनें:", allowed_subs, key="stud_sub_select")
-                st.markdown(f"#### 📝 {selected_sub} का स्टडी मटीरियल")
+        with t_stu:
+            st.subheader("👥 छात्रों की सूची")
+            s_list = database.get_all_users_by_role('student')
+            if s_list:
+                for u_data in s_list:
+                    username, name, _, a_class, a_subs, status, mobile, s_board, s_school = u_data[:9]
+                    st.markdown(f"""
+                    <div style='background-color:#f9f9f9; padding:12px; border-radius:8px; border:1px solid #eee; margin-bottom:10px;'>
+                        <b>छात्र:</b> {name} (<code>{username}</code>) | 📞 <b>मोबाइल:</b> {mobile} <br>
+                        🏫 <b>स्कूल:</b> {s_school} | 🏛️ <b>बोर्ड:</b> {s_board} | 📖 <b>कक्षा:</b> {a_class} | 🎯 <b>विषय:</b> {a_subs} | 🟢 <b>स्टेटस:</b> {status.upper()}
+                    </div>
+                    """, unsafe_allow_html=True)
+                    b1, b2, b3, _ = st.columns([2, 2, 2, 4])
+                    if status in ['pending', 'blocked'] and b1.button("✅ Approve", key=f"ap_{username}"):
+                        database.update_user_status(username, 'active'); st.rerun()
+                    if status == 'active' and b2.button("🚫 Block", key=f"bl_{username}"):
+                        database.update_user_status(username, 'blocked'); st.rerun()
+                    if b3.button("🗑️ Delete", key=f"dl_{username}"):
+                        database.delete_user(username); st.rerun()
+            else: st.write("कोई छात्र डेटा नहीं है।")
                 
-                student_materials = database.get_materials_by_access(user_info['class'], selected_sub)
-                
-                if not student_materials:
-                    st.info(f"अभी {user_info['class']} के {selected_sub} विषय में कोई नया मटीरियल अपलोड नहीं हुआ है।")
-                else:
-                    for mat in student_materials:
-                        sm_id, sm_title, sm_pdf_name, sm_pdf_data, sm_video = mat
-                        with st.container():
-                            st.markdown(f"##### 📖 {sm_title}")
-                            col1, col2 = st.columns(2)
-                            if sm_pdf_name:
-                                with col1:
-                                    st.caption(f"📄 नोट्स: {sm_pdf_name}")
-                                    st.download_button(label="📥 Download PDF Notes", data=sm_pdf_data, file_name=sm_pdf_name, mime="application/pdf", key=f"st_dl_{sm_id}")
-                            if sm_video:
-                                with col2:
-                                    st.caption("📺 वीडियो लेक्चर देखें:")
-                                    try:
-                                        st.video(sm_video)
-                                    except:
-                                        st.write(f"🔗 लिंक: {sm_video}")
-                        st.markdown("---")
-                        
-        with st_tab2:
-            st.write("### ❓ अपना सवाल पूछें")
-            q_text = st.text_area("अपना सवाल यहाँ टाइप करें:", placeholder="यहाँ अपना प्रश्न लिखें...")
-            q_img = st.file_uploader("या अपने सवाल की फोटो अपलोड करें (Optional):", type=["png", "jpg", "jpeg"])
+        with t_tea:
+            st.subheader("➕ नए शिक्षक को क्लास और विषय अलॉट करें")
+            t_user = st.text_input("टीचर यूजरनेम (Unique Code)")
+            t_fullname_input = st.text_input("शिक्षक का पूरा नाम")
+            t_pass = st.text_input("लॉगिन पासवर्ड", type="password")
+            t_class = st.selectbox("टीचर को कौन सी क्लास अलॉट करनी है?", ["Class 9", "Class 10", "Class 11", "Class 12"])
+            t_subjects_input = st.multiselect("टीचर के विषय चुनें (एक से ज़्यादा चुन सकते हैं)", ["Physics", "Chemistry", "Biology", "Maths", "Social Science", "English", "Hindi"])
+            t_mob = st.text_input("टीचर का मोबाइल नंबर")
             
-            if st.button("🚀 सवाल एडमिन को भेजें", key="ask_dbt_btn"):
-                if q_text or q_img:
-                    img_name, img_bytes = None, None
-                    if q_img is not None:
-                        img_name = q_img.name
-                        img_bytes = q_img.read()
-                        
-                    database.add_doubt(user_info['username'], user_info['name'], q_text, img_name, img_bytes)
-                    st.success("🎉 आपका सवाल सफलतापूर्वक टीचर के पास भेज दिया गया है!")
-                    st.rerun()
-                else:
-                    st.warning("कृपया कुछ टाइप करें या फोटो अपलोड करें!")
-                    
+            if st.button("➕ शिक्षक को रजिस्टर और अलॉट करें", width='stretch'):
+                if t_user.strip() and t_fullname_input.strip() and t_pass.strip():
+                    if t_subjects_input:
+                        subs_str = ", ".join(t_subjects_input)
+                        success, msg = database.add_user(username=t_user.strip(), name=t_fullname_input.strip(), password=t_pass.strip(), role='teacher', student_class=t_class, mobile=t_mob.strip(), subject=subs_str)
+                        if success:
+                            database.update_user_status(t_user.strip(), 'active')
+                            st.success(f"🎉 शिक्षक {t_fullname_input} पंजीकृत हो गए!")
+                            st.rerun()
+                        else: st.error(msg)
+                    else: st.error("कृपया कम से कम एक विषय चुनें!")
+                else: st.warning("सभी अनिवार्य बॉक्स भरें!")
+            
             st.markdown("---")
-            st.write("### 📋 आपके पुराने सवाल और उनके जवाब")
+            st.subheader("👥 वर्तमान में एक्टिव शिक्षकों की सूची")
+            tea_list = database.get_all_users_by_role('teacher')
+            if tea_list:
+                for t_data in tea_list:
+                    st.markdown(f"""
+                    <div style='background-color:#f0f7ff; padding:12px; border-radius:8px; border:1px solid #d0e3ff; margin-bottom:10px;'>
+                        👨‍🏫 <b>शिक्षक:</b> {t_data[1]} (<code>{t_data[0]}</code>) | 📞 <b>मोबाइल:</b> <span style='color:#1E3A8A; font-weight:bold;'>{t_data[6] if t_data[6] else 'N/A'}</span> <br>
+                        📖 <b>अलॉटेड कक्षा:</b> {t_data[3] if t_data[3] else 'Not Assigned'} | 🎯 <b>विषय:</b> <span style='color:#b25900; font-weight:bold;'>{t_data[4] if t_data[4] else 'Not Selected'}</span>
+                    </div>
+                    """, unsafe_allow_html=True)
+                    if st.button(f"🗑️ शिक्षक {t_data[1]} को पद से हटाएं", key=f"del_t_{t_data[0]}"):
+                        database.delete_user(t_data[0]); st.rerun()
+            else: st.write("अभी तक कोई शिक्षक नहीं जोड़ा गया है।")
+
+        with t_mat:
+            st.subheader("📚 पर अपलोड किया गया कुल स्टडी मटेरियल")
+            m_cls = st.selectbox("कक्षा चुनें:", ["Class 9", "Class 10", "Class 11", "Class 12"], key="m_c")
+            m_sub = st.selectbox("विषय चुनें:", ["Physics", "Chemistry", "Biology", "Maths", "Social Science", "English", "Hindi"], key="m_s")
+            mat_data = database.get_materials_by_class_subject(m_cls, m_sub)
+            if mat_data:
+                for mid, title, p_name, _, v_url, up_by in mat_data:
+                    st.write(f"📝 **{title}** (द्वारा अपलोड: `{up_by}`)")
+                    if st.button(f"🗑️ डिलीट मटेरियल (ID: {mid})", key=f"del_m_{mid}"):
+                        database.delete_material(mid); st.success("डिलीट सफल!"); st.rerun()
+            else: st.info("इस क्लास/सब्जेक्ट में अभी कोई नोट्स नहीं हैं।")
+
+        with t_lnk:
+            st.subheader("🔗 WhatsApp / लाइव क्लास लिंक सेट करें")
+            link_title = st.text_input("लिंक हेडलाइन")
+            actual_url = st.text_input("URL लिंक")
+            if st.button("🔗 लिंक लाइव करें"):
+                database.add_portal_notice("Urgent Link", link_title, actual_url, datetime.today().strftime('%d-%b-%Y'))
+                st.success("लिंक लाइव हो गया!")
+                
+        with t_ana:
+            st.subheader("📊 लाइव康复报告")
+            df_city, df_school, df_month, df_daily = database.get_analytics_data()
+            if not df_city.empty or not df_school.empty:
+                c1, c2 = st.columns(2)
+                with c1: st.markdown("#### 🏛️ टॉप शहर"); st.bar_chart(df_city.set_index('city'))
+                with c2: st.markdown("#### 🏫 टॉप स्कूल"); st.bar_chart(df_school.set_index('school'))
+                st.markdown("---"); st.markdown("#### 📈 पिछले 7 दिनों का ट्रैफिक")
+                st.dataframe(df_daily, use_container_width=True)
+            else: st.info("💡 जैसे ही छात्र लॉगिन करेंगे, ग्राफ लाइव हो जाएगा!")
+
+        # ==========================================
+        # 🔐 [नया टैब]: सुपर एडमिन पासवर्ड चेंज सिस्टम
+        # ==========================================
+        with t_pwd:
+            st.subheader("🔐 सुपर एडमिन पासवर्ड बदलें")
+            st.write("पोर्टल को सुरक्षित रखने के लिए आप यहाँ से अपना मास्टर पासवर्ड बदल सकते हैं।")
             
-            my_doubts = database.get_student_doubts(user_info['username'])
-            if not my_doubts:
-                st.info("आपने अभी तक कोई सवाल नहीं पूछा है।")
-            else:
-                for d_row in my_doubts:
-                    d_txt, d_img_n, d_img_b, d_rep, d_status = d_row
-                    with st.expander(f"{'✅ सॉल्व हो गया' if d_status == 'resolved' else '⏳ पेंडिंग है'} - {d_txt[:30] if d_txt else 'फोटो प्रश्न'}"):
-                        if d_txt:
-                            st.write(f"**आपका सवाल:** {d_txt}")
-                        if d_img_b:
-                            st.image(d_img_b, caption="आपकी अपलोडेड फोटो", use_container_width=True)
-                        
-                        st.markdown("---")
-                        if d_status == 'resolved':
-                            st.success(f"👨‍🏫 **शिक्षक का जवाब:** {d_rep}")
+            # डेटाबेस से एडमिन की करंट जानकारी उठाना
+            admin_data = database.get_user_by_username('admin')
+            current_db_password = admin_data[2] if admin_data else "admin123"
+            
+            old_pwd = st.text_input("वर्तमान (पुराना) पासवर्ड दर्ज करें", type="password", key="adm_old_pwd")
+            new_pwd = st.text_input("नया मजबूत पासवर्ड बनाएं", type="password", key="adm_new_pwd")
+            confirm_new_pwd = st.text_input("नया पासवर्ड दोबारा टाइप करें", type="password", key="adm_conf_pwd")
+            
+            if st.button("🔄 मास्टर पासवर्ड अपडेट करें", type="primary", width='stretch'):
+                if old_pwd.strip() == current_db_password:
+                    if new_pwd.strip() and confirm_new_pwd.strip():
+                        if new_pwd.strip() == confirm_new_pwd.strip():
+                            # डेटाबेस में पासवर्ड अपडेट करना
+                            database.reset_user_password('admin', new_pwd.strip())
+                            st.success("🎉 सुपर एडमिन का पासवर्ड सफलतापूर्वक बदल गया है! अगली बार से नए पासवर्ड का उपयोग करें।")
                         else:
-                            st.warning("⏳ शिक्षक जल्द ही इस सवाल का जवाब देंगे।")
+                            st.error("❌ दोनों नए पासवर्ड आपस में मैच नहीं कर रहे हैं!")
+                    else:
+                        st.warning("⚠️ कृपया नया पासवर्ड खाली न छोड़ें!")
+                else:
+                    st.error("❌ आपका पुराना पासवर्ड गलत है! सुरक्षा कारणों से बदलाव रिजेक्ट किया गया।")
+
+    # 👨‍🏫 [B] शिक्षक (Teacher) पैनल
+    elif user_info['role'].lower() == 'teacher':
+        st.title(f"👨‍🏫 शिक्षक कंट्रोल पैनल - डिजिटल पाठशाला")
+        t_info = database.get_user_by_username(user_info['username'])
+        t_class, t_sub_list = t_info[4], t_info[5]
+        st.info(f"📋 जिम्मेदारी: {t_class} | विषय: {t_sub_list}")
+        
+        t_upload, t_doubts = st.tabs(["📚 स्टडी मटेरियल (Upload/Delete)", "❓ छात्रों के डाउट्स (Doubt Solver)"])
+        with t_upload:
+            available_subs = [s.strip() for s in t_sub_list.split(",")]
+            m_subject = st.selectbox("विषय चुनें", available_subs)
+            m_title = st.text_input("चैप्टर का नाम")
+            m_video = st.text_input("वीडियो लिंक", value="https://")
+            m_file = st.file_uploader("PDF नोट्स", type=["pdf"])
+            if st.button("🚀 मटेरियल लाइव करें", width='stretch'):
+                if m_title:
+                    p_name = m_file.name if m_file else None
+                    p_data = m_file.read() if m_file else None
+                    database.add_material(t_class, m_subject, m_title, p_name, p_data, m_video, uploaded_by=user_info['name'])
+                    st.success("🎉 मटेरियल लाइव हो गया!"); st.rerun()
+            st.markdown("---")
+            for sub in available_subs:
+                st.markdown(f"**📚 विषय: {sub}**")
+                my_mats = database.get_materials_by_class_subject(t_class, sub)
+                if my_mats:
+                    for mid, title, p_name, _, _, _ in my_mats:
+                        col_m1, col_m2 = st.columns([8, 2])
+                        col_m1.write(f"📝 चैप्टर: **{title}** | File: {p_name if p_name else 'No PDF'}")
+                        if col_m2.button("🗑️ हटाएँ", key=f"t_del_{mid}"):
+                            database.delete_material(mid); st.rerun()
+
+        with t_doubts:
+            st.subheader("❓ छात्रों द्वारा पूछे गए सवाल")
+            class_doubts = database.get_doubts_by_class(t_class)
+            if class_doubts:
+                for d_id, s_name, _, d_text, r_text, i_name, i_data in class_doubts:
+                    st.markdown(f"<div style='background-color:#fffbf0; padding:10px; border-left:4px solid #f59e0b; margin-bottom:5px;'><b>{s_name}:</b> {d_text}</div>", unsafe_allow_html=True)
+                    if i_data:
+                        st.image(i_data, caption=f"🖼️ {s_name} द्वारा भेजी गई फोटो", width=400)
+                    if r_text: st.success(f"✍️ **जवाब:** {r_text}")
+                    else:
+                        reply_input = st.text_area("जवाब लिखें...", key=f"rep_in_{d_id}")
+                        if st.button("🚀 जवाब भेजें", key=f"rep_btn_{d_id}"):
+                            database.reply_to_doubt(d_id, reply_input.strip(), user_info['name'])
+                            st.rerun()
+            else: st.info("कोई नया सवाल नहीं है।")
+            
+    # --- 📚 [C] छात्र डैशबोर्ड ---
+    # ==========================================
+    # 📚 [C] छात्र डैशबोर्ड (7-Days Free Trial & Payment System)
+    # ==========================================
+    else:
+        st.title(f"👋 डिजिटल पाठशाला स्टूडेंट ज़ोन")
+        
+        # 🔍 डेटाबेस से छात्र की पूरी जानकारी और जुड़ने की तारीख निकालना
+        s_info = database.get_user_by_username(user_info['username'])
+        s_class, s_sub = user_info['assigned_class'], user_info['allowed_subjects']
+        
+        # 📅 ट्रायल के दिनों की गणना करना
+        join_date_str = s_info[10] if (s_info and len(s_info) > 10 and s_info[10]) else datetime.today().strftime('%d-%b-%Y')
+        
+        try:
+            join_date = datetime.strptime(join_date_str, '%d-%b-%Y')
+            today_date = datetime.today()
+            days_used = (today_date - join_date).days
+        except:
+            days_used = 0 # अगर कोई गड़बड़ हो तो डिफ़ॉल्ट 0 दिन
+            
+        days_left = 7 - days_used
+
+        # 🚨 केस 1: अगर 7 दिन का ट्रायल खत्म हो चुका है (8वां दिन या उससे ज़्यादा)
+        if days_left < 0:
+            st.error("⚠️ आपका 7 दिनों का फ्री ट्रायल पीरियड समाप्त हो चुका है!")
+            
+            pay_col1, pay_col2 = st.columns([6, 4])
+            
+            with pay_col1:
+                st.markdown("""
+                <div style='background-color:#FEF2F2; padding:20px; border-radius:10px; border-left:6px solid #DC2626;'>
+                    <h3 style='color:#991B1B; margin-top:0;'>🔒 पढ़ाई जारी रखने के लिए मासिक फीस जमा करें</h3>
+                    <p style='color:#7F1D1D; font-size:16px;'>डिजिटल पाठशाला का उद्देश्य हर घर तक सस्ती और बेहतरीन शिक्षा पहुँचाना है। माता-पिता पर एक बार में बोझ न पड़े, इसलिए हमारी फीस केवल मंथली ली जाती है।</p>
+                    <hr style='border-color:#FCA5A5;'>
+                    <p style='font-size:18px; color:#DC2626;'><b>💵 मासिक फीस:</b> <span style='font-size:24px; font-weight:bold;'>₹99</span> / प्रति महीना</p>
+                    <p style='font-size:15px;'><b>📞 सहायता एवं एक्टिवेशन के लिए:</b> +91 7903088647 (नितेश सर)</p>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                st.info("💡 भुगतान (₹99) करने के बाद अपने पेमेंट का स्क्रीनशॉट ऊपर दिए गए नंबर पर WhatsApp करें। एडमिन तुरंत आपकी क्लास अगले 1 महीने के लिए एक्टिव कर देंगे।")
+            
+            with pay_col2:
+                st.markdown("<div style='text-align:center; font-weight:bold;'>📱 किसी भी UPI ऐप से ₹99 स्कैन करें</div>", unsafe_allow_html=True)
+                
+                # 🎯 ⬇️ यहाँ नीचे 'NITESHSIR@upi' को अपनी असली UPI ID से बदल लीजिएगा ⬇️
+                my_real_upi = "9304768496@ybl" 
+                
+                # 📸 यह कोड अपने आप ₹99 और आपका नाम स्कैन करते ही छात्र के मोबाइल में भर देगा
+                qr_link = f"https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=upi://pay?pa={my_real_upi}&pn=Nitesh%20Sir&am=99&cu=INR"
+                st.image(qr_link, caption="📸 डिजिटल पाठशाला मर्चेंट QR कोड", use_container_width=True)
+                
+        # 🟢 केस 2: अगर छात्र अभी ट्रायल पीरियड के अंदर है (1 से 7 दिन)
+        else:
+            # ऊपर एक सुंदर सा अलर्ट बार दिखेगा कि कितने दिन बचे हैं
+            if days_left == 0:
+                st.warning(f"⏰ ध्यान दें: आज आपके फ्री ट्रायल का **आखरी दिन** है! कल से कोर्स लॉक हो जाएगा।")
+            else:
+                st.success(f"🎉 आपका फ्री ट्रायल एक्टिव है! आपके पास अपनी पढ़ाई के लिए **{days_left} दिन** और बचे हैं।")
+                
+            col_info1, col_info2 = st.columns(2)
+            col_info1.metric(label="आपकी कक्षा", value=s_class)
+            col_info2.metric(label="आपके विषय", value=s_sub)
+            
+            s_study, s_doubts = st.tabs(["📖 आपके क्लास नोट्स & वीडियो", "❓ डाउट कॉर्नर (Ask Teacher)"])
+            
+            with s_study:
+                if s_sub:
+                    student_subs = [s.strip() for s in s_sub.split(",")]
+                    st.markdown("### 📖 आपके विषयों के अनुसार नोट्स और वीडियो लेक्चर्स")
+                    subs_tabs = st.tabs(student_subs)
+                    
+                    for index, each_sub in enumerate(student_subs):
+                        with subs_tabs[index]:
+                            st.markdown(f"#### 📚 {each_sub} स्टडी ज़ोन")
+                            materials = database.get_materials_by_class_subject(s_class, each_sub)
+                            if materials:
+                                for mid, title, pdf_name, pdf_data, video_url, up_by in materials:
+                                    st.markdown(f"""
+                                    <div style='background-color:#f9f9f9; padding:10px; border-left:4px solid #1E3A8A; margin-top:15px; margin-bottom:5px;'>
+                                        <b style='font-size:16px; color:#1E3A8A;'>📝 टॉपिक/चैप्टर: {title}</b> <span style='color:#6B7280; font-size:12px;'>(शिक्षक: {up_by})</span>
+                                    </div>
+                                    """, unsafe_allow_html=True)
+                                    v_col, p_col = st.columns(2)
+                                    with v_col:
+                                        if video_url and video_url.startswith("http") and ("youtube.com" in video_url or "youtu.be" in video_url):
+                                            st.video(video_url)
+                                        elif video_url and video_url != "https://": st.warning("⚠️ वीडियो लिंक सही नहीं है।")
+                                        else: st.info("📺 वीडियो उपलब्ध नहीं है।")
+                                    with p_col:
+                                        if pdf_name and pdf_data:
+                                            st.success(f"📄 नोट्स: {pdf_name}")
+                                            st.download_button(label=f"📥 डाउनलोड: {pdf_name}", data=pdf_data, file_name=pdf_name, mime="application/pdf", key=f"sd_btn_{mid}")
+                                        else: st.info("📄 पीडीएफ उपलब्ध नहीं है।")
+                            else: st.info(f"✨ इस विषय में कोई मटीरियल नहीं है।")
+                else: st.warning("⚠️ कोई विषय अलॉट नहीं हुआ है।")
+                
+            with s_doubts:
+                st.subheader("❓ अपने शिक्षक से कोई भी सवाल पूछें")
+                s_doubt_text = st.text_area("अपना सवाल यहाँ विस्तार से लिखिए...", key="st_doubt_box")
+                uploaded_img = st.file_uploader("📷 सवाल का फोटो खींचें या इमेज अपलोड करें", type=["png", "jpg", "jpeg"], key="st_doubt_img")
+                
+                if st.button("🚀 शिक्षक के पास भेजें", key="st_send_doubt_btn", width='stretch'):
+                    if s_doubt_text.strip() or uploaded_img:
+                        img_name = uploaded_img.name if uploaded_img else None
+                        img_data = uploaded_img.read() if uploaded_img else None
+                        database.add_doubt(user_info['username'], user_info['name'], s_class, s_doubt_text.strip(), img_name, img_data)
+                        st.success("🎉 सवाल और फोटो सफलतापूर्वक भेज दी गई!"); st.rerun()
+                    else: st.warning("⚠️ कृपया सवाल लिखें या इमेज अपलोड करें!")
+                        
+                st.markdown("---")
+                st.subheader("📜 आपके द्वारा पहले पूछे गए सवालों के जवाब")
+                my_doubts = database.get_doubts_by_student(user_info['username'])
+                if my_doubts:
+                    for d_id, d_txt, r_txt, r_by, i_name, i_data in my_doubts:
+                        st.markdown(f"<div style='background-color:#F3F4F6; padding:12px; border-radius:6px; margin-top:10px;'><b>❓ आपका सवाल:</b> {d_txt}</div>", unsafe_allow_html=True)
+                        if i_data:
+                            st.image(i_data, caption="🖼️ आपके द्वारा अपलोड की गई इमेज", width=300)
+                        if r_txt: st.markdown(f"<div style='background-color:#ECFDF5; padding:12px; border-radius:6px; border-left:4px solid #10B981; margin-top:5px;'><b>✍️ जवाब (द्वारा {r_by}):</b> {r_txt}</div>", unsafe_allow_html=True)
+                        else: st.markdown("<div style='background-color:#FFFBEB; padding:12px; border-radius:6px; border-left:4px solid #F59E0B; margin-top:5px;'>⏳ शिक्षक जल्द ही जवाब देंगे।</div>", unsafe_allow_html=True)
+                else: st.info("✨ आपने अभी तक कोई सवाल नहीं पूछा है।")
+                
+# ==========================================
+# केस 2: मुख्य वेबसाइट होमपेज (लॉगिन/रजिस्ट्रेशन)
+# ==========================================
+else:
+    st.markdown("<div class='main-title'>🎓 DIGITAL PATHSHALA</div>", unsafe_allow_html=True)
+    st.markdown("<div class='sub-title'>बिहार का सबसे आधुनिक ऑनलाइन लर्निंग वेब पोर्टल</div>", unsafe_allow_html=True)
+    
+    left_content, right_login = st.columns([7, 3])
+    with left_content:
+        rules, planning = database.get_portal_info()
+        t1, t2 = st.tabs(["📋 नियम", "📅 स्टडी प्लान"])
+        with t1: st.markdown(rules)
+        with t2: st.markdown(planning)
+        st.markdown("---"); st.subheader("📢 लेटेस्ट अपडेट्स")
+        raw_notices = database.get_all_notices()
+        table_data = []
+        for nid, ntype, title, link, date in raw_notices:
+            if ntype != "Urgent Link":
+                clickable_title = f'<a href="{link}" target="_blank">{title} 🔗</a>' if link and link != "https://" else title
+                table_data.append({"तारीख": date, "कैटेगरी": ntype, "विषय / लिंक": clickable_title})
+        if table_data: st.write(pd.DataFrame(table_data).to_html(escape=False, index=False), unsafe_allow_html=True)
+
+    with right_login:
+        st.markdown("<div style='background-color:#1E3A8A; padding:10px; text-align:center; color:white; border-radius:8px 8px 0 0;'><b>🔐 छात्र / शिक्षक प्रवेश द्वार</b></div>", unsafe_allow_html=True)
+        choice = st.radio("चुनें:", ["लॉगिन", "साइनअप (रजिस्टर)", "पासवर्ड रीसेट"], horizontal=True)
+        st.markdown("---")
+        
+        if choice == "लॉगिन":
+            username = st.text_input("यूजरनेम")
+            password = st.text_input("पासवर्ड", type="password")
+            city_input = st.text_input("आपका शहर", value="Patna")
+            
+            if st.button("पोर्टल में प्रवेश करें 🚀", width='stretch'):
+                u_strip, p_strip = username.strip(), password.strip()
+                
+                # 🔍 बिना किसी शॉर्टकट के सीधे डेटाबेस से वेरिफिकेशन
+                user = database.get_user_by_username(u_strip)
+                
+                if user and user[2] == p_strip:
+                    if user[6] == 'blocked': 
+                        st.error("🚫 आप ब्लॉक हैं!")
+                    else:
+                        st.session_state.logged_in = True
+                        st.session_state.user_info = {
+                            'username': user[0], 
+                            'name': user[1], 
+                            'role': user[3], 
+                            'assigned_class': user[4], 
+                            'allowed_subjects': user[5]
+                        }
+                        if user[3] == 'student': 
+                            database.log_user_activity(user[0], city=city_input.strip(), school=user[9])
+                        st.success("लॉगिन सफल!"); st.rerun()
+                        
+                # 🛠️ बैकअप क्रेडेंशियल (केवल तब काम करेगा जब आपने नया पासवर्ड न बदला हो या DB फ्रेश हो)
+                elif u_strip == 'admin' and p_strip == 'admin123':
+                    st.session_state.logged_in = True
+                    st.session_state.user_info = {'username': 'admin', 'name': 'Main Owner', 'role': 'super_admin'}
+                    st.success("लॉगिन सफल!"); st.rerun()
+                else: 
+                    st.error("गलत जानकारी!")
+                    
+        elif choice == "साइनअप (रजिस्टर)":
+            new_username = st.text_input("यूजरनेम बनाएं (बिना स्पेस के)", key="su_user")
+            new_name = st.text_input("अपना पूरा नाम", key="su_name")
+            new_password = st.text_input("पासवर्ड सेट करें", type="password", key="su_pass")
+            student_school = st.text_input("अपने स्कूल का पूरा नाम", key="su_school")
+            student_board = st.selectbox("अपना परीक्षा बोर्ड चुनें", ["BSEB (Bihar Board)", "CBSE Board"], key="su_board")
+            student_class = st.selectbox("अपनी कक्षा चुनें", ["Class 9", "Class 10", "Class 11", "Class 12"], key="su_class")
+            student_subjects = st.multiselect("अपने मुख्य विषय चुनें", ["Physics", "Chemistry", "Biology", "Maths", "Social Science", "English", "Hindi"], key="su_subs")
+            mobile = st.text_input("मोबाइल नंबर", key="su_mob")
+            
+            if st.button("रजिस्ट्रेशन सबमिट करें 🎉", width='stretch', key="su_submit_btn"):
+                if new_username.strip() and new_name.strip() and new_password.strip() and mobile.strip() and student_school.strip() and student_subjects:
+                    subs_str = ", ".join(student_subjects)
+                    success, msg = database.add_user(username=new_username.strip(), name=new_name.strip(), password=new_password.strip(), role='student', student_class=student_class, mobile=mobile.strip(), subject=subs_str, board=student_board, school=student_school.strip())
+                    if success: st.success("🎉 रजिस्ट्रेशन सफल! एडमिन अप्रूवल का इंतज़ार करें।")
+                    else: st.error(msg)
+                else: st.warning("सभी बॉक्स भरना अनिवार्य है।")
+
+        elif choice == "पासवर्ड रीसेट":
+            st.caption("🔒 सुरक्षा जांच: पासवर्ड बदलने के लिए अपना रजिस्टर्ड मोबाइल नंबर और मास्टर सिक्योरिटी कोड डालें।")
+            f_username = st.text_input("अपना रजिस्टर्ड यूजरनेम", key="pwd_res_user")
+            f_mobile = st.text_input("अपना 10 अंकों का मोबाइल नंबर", key="pwd_res_mob")
+            f_master_otp = st.text_input("मास्टर सुरक्षा कोड (OTP कोड)", type="password", key="pwd_res_otp")
+            f_new_password = st.text_input("नया मजबूत पासवर्ड सेट करें", type="password", key="pwd_res_pass")
+            
+            if st.button("🔄 पासवर्ड सुरक्षित बदलें", width='stretch', key="pwd_res_btn"):
+                u_res = f_username.strip()
+                m_res = f_mobile.strip()
+                p_res = f_new_password.strip()
+                otp_res = f_master_otp.strip()
+                
+                if u_res and m_res and p_res and otp_res:
+                    if otp_res == "9939":
+                        user_data = database.get_user_by_username(u_res)
+                        if user_data:
+                            db_mobile = user_data[7] if user_data[7] else ""
+                            if m_res == db_mobile:
+                                database.reset_user_password(u_res, p_res)
+                                st.success(f"🎉 यूज़र `{u_res}` का पासवर्ड सुरक्षित रीसेट हो गया है! अब नए पासवर्ड से लॉगिन करें।")
+                            else: st.error("❌ मोबाइल नंबर मैच नहीं हुआ! कृपया वही नंबर डालें जो रजिस्ट्रेशन के वक्त दिया था।")
+                        else: st.error("❌ यह यूजरनेम डेटाबेस में नहीं मिला!")
+                    else: st.error("❌ गलत मास्टर सुरक्षा कोड! आप इस पोर्टल के मुख्य ओनर नहीं हैं।")
+                else: st.warning("⚠️ कृपया चारों इनपुट बॉक्स को ठीक से भरें!")
