@@ -296,17 +296,14 @@ def get_all_notices():
     try:
         conn = sqlite3.connect('database.db')
         cursor = conn.cursor()
-        # आपकी app.py के अनुसार 5 कॉलम (id, ntype, title, link, date) होने चाहिए
         cursor.execute("SELECT id, title, content, date, date FROM notices ORDER BY id DESC")
         raw_data = cursor.fetchall()
         conn.close()
         
-        # इसे 5 वैल्यू के फॉर्मेट में सेट करना
         for row in raw_data:
             notices.append((row[0], "सामान्य", row[1], row[2], row[3]))
         return notices
     except Exception:
-        # अगर लाइव सर्वर पर टेबल नहीं है, तो यह 5 वैल्यू का डिफ़ॉल्ट नोटिस भेजेगा ताकि ऐप तुरंत खुल जाए
         default_notices = [
             (1, "📢 नोटिस", "👋 डिजिटल पाठशाला में आपका स्वागत है!", "https://github.com", "2026-05-29")
         ]
@@ -315,7 +312,7 @@ def get_all_notices():
 def get_portal_info():
     """पोर्टल के नियम और प्लानिंग की जानकारी डिफ़ॉल्ट रूप से दिखाने के लिए"""
     rules = """
-    ### 📑 डिजिटल पाठशाला के नियम एवं स्टडी充लना
+    ### 📑 डिजिटल पाठशाला के नियम एवं स्टडी प्लान
     
     #### 📦 Only Study (केवल पढ़ाई) प्लान:
     * ⏱️ नए छात्रों को 7 दिन का फ्री ट्रायल क्लास मिलेगा।
