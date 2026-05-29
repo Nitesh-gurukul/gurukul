@@ -18,12 +18,21 @@ st.set_page_config(
 )
 
 # स्ट्रीमलिट का डिफ़ॉल्ट लोगो, मेनू और फुटर हटाने का CSS
+Q# 🛑 पुराने hide_streamlit_style को हटाकर इस नए वाले को पेस्ट करें:
+
 hide_streamlit_style = """
             <style>
-            #MainMenu {visibility: hidden;}       /* ऊपर का 3-डॉट मेनू छुपाने के लिए */
-            footer {visibility: hidden;}          /* नीचे का 'Made with Streamlit' हटाने के लिए */
-            header {visibility: hidden;}          /* टॉप का हेडर बार छुपाने के लिए */
-            stDecoration {display:none;}          /* स्ट्रीमलिट की एक्स्ट्रा लाइनों को हटाने के लिए */
+            /* 1. ऊपर का 3-डॉट मेनू और पूरा हेडर गायब करने के लिए */
+            [data-testid="stHeader"] {visibility: hidden !important; display: none !important;}
+            header {visibility: hidden !important; display: none !important;}
+            
+            /* 2. नीचे का 'Made with Streamlit' फुटर हटाने के लिए */
+            footer {visibility: hidden !important; display: none !important;}
+            [data-testid="stFooter"] {visibility: hidden !important; display: none !important;}
+            
+            /* 3. स्ट्रीमलिट की टॉप डेकोरेशन लाइनों को साफ करने के लिए */
+            div block-container {padding-top: 2rem !important;}
+            .stDecoration {display: none !important;}
             </style>
             """
 st.markdown(hide_streamlit_style, unsafe_allow_html=True)
