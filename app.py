@@ -10,7 +10,23 @@ import io
 # ==========================================
 # SECTION 1: पेज सेटिंग, API चाबियाँ और सेशन स्टेट्स
 # ==========================================
-st.set_page_config(page_title="Digital Pathshala", layout="wide")
+LOGO_URL = "https://raw.githubusercontent.com/Nitesh-gurukul/gurukul/main/logo.png"
+st.set_page_config(
+    page_title="Pathshala",          # ब्राउज़र टैब में नाम 'Pathshala' दिखेगा
+    page_icon=LOGO_URL,              # यहाँ गिटहब वाला लोगो चमकेगा
+    layout="wide"                    # स्क्रीन को फुल चौड़ाई देने के लिए
+)
+
+# स्ट्रीमलिट का डिफ़ॉल्ट लोगो, मेनू और फुटर हटाने का CSS
+hide_streamlit_style = """
+            <style>
+            #MainMenu {visibility: hidden;}       /* ऊपर का 3-डॉट मेनू छुपाने के लिए */
+            footer {visibility: hidden;}          /* नीचे का 'Made with Streamlit' हटाने के लिए */
+            header {visibility: hidden;}          /* टॉप का हेडर बार छुपाने के लिए */
+            stDecoration {display:none;}          /* स्ट्रीमलिट की एक्स्ट्रा लाइनों को हटाने के लिए */
+            </style>
+            """
+st.markdown(hide_streamlit_style, unsafe_allow_html=True)
 
 # 🔑 अपनी चाबियाँ (Keys) यहाँ डालें
 GEMINI_API_KEY = "AIzaSyBZaNvUTgiuU_HdTq5D6KpIo03eU55p5_M"  # <-- यहाँ अपनी आज वाली जेमिनी की पेस्ट करें
