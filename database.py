@@ -290,31 +290,29 @@ def increment_unlocked_tests(username):
     conn.commit()
     conn.close()
 
-def get_portal_info():
-    """पोर्टल के नियम और प्लानिंग की जानकारी डेटाबेस से लाने के लिए"""
-    conn = sqlite3.connect('database.db')
-    cursor = conn.cursor()
-    
-    # यह चेक करेगा कि क्या टेबल में पहले से डेटा है, नहीं तो डिफ़ॉल्ट डेटा देगा
+def get_all_notices():
+    """डेटाबेस से सभी नोटिस लाने के लिए (एरर सेफ्टी बैकअप के साथ)"""
+    notices = []
     try:
-        cursor.execute("SELECT rules, planning FROM portal_info LIMIT 1")
-        result = cursor.fetchone()
-        if result:
-            conn.close()
-            return result[0], result[1]
+        conn = sqlite3.connect('database.db')
+        cursor = conn.cursor()
+        cursor.execute("SELECT id, title, content, date FROM notices ORDER BY id DESC")
+        notices = cursor.fetchall()
+        conn.close()
+        return notices
     except Exception:
-        # अगर टेबल नहीं बनी है, तो यह डिफ़ॉल्ट टेक्स्ट वापस भेजेगा ताकि ऐप क्रैश न हो
-        pass
-        
-    conn.close()
-    return "नियम अभी अपडेट नहीं किए गए हैं।", "प्लानिंग अभी अपडेट नहीं की गई है।"
+        # अगर डेटाबेस में notices टेबल नहीं बनी है, तो लाइव ऐप क्रैश होने के बजाय ये डिफ़ॉल्ट नोटिस दिखाएगा
+        default_notices = [
+            (1, "👋 डिजिटल पाठशाला में आपका स्वागत है!", "प्रिय छात्रों, आपकी ऑनलाइन कक्षाएं सुचारू रूप से लाइव हो चुकी हैं। मन लगाकर पढ़ाई करें!", "2026-05-29")
+        ]
+        return default_notices
 
 def get_portal_info():
     """पोर्टल के नियम और प्लानिंग की जानकारी डिफ़ॉल्ट रूप से दिखाने के लिए"""
     rules = """
     ### 📑 डिजिटल पाठशाला के नियम एवं स्टडी प्लान
     
-    #### 📦 Only Study (केवल पढ़ाई) प्लान:
+    #### 📦 Only Study (केवल पढ़ाई)充न:
     * ⏱️ नए छात्रों को 7 दिन का फ्री ट्रायल क्लास मिलेगा।
     * 🎓 विषयवार प्रीमियम वीडियो लेक्चर्स और पीडीएफ नोट्स।
     * 🎁 इस प्लान वाले छात्रों को हर महीने 1 ऑनलाइन मॉक टेस्ट बिल्कुल फ्री मिलेगा।
@@ -328,7 +326,6 @@ def get_portal_info():
     * 💳 पहला फ्री टेस्ट देने के बाद, अगले हर टेस्ट के लिए मात्र ₹15 का ऑनलाइन भुगतान करना होगा।
     """
     
-    # अगर डेटाबेस में कोई मैन्युअल बदलाव हो तो वहां से लाए, नहीं तो ऊपर वाला डिफ़ॉल्ट दिखाए
     try:
         conn = sqlite3.connect('database.db')
         cursor = conn.cursor()
