@@ -291,28 +291,33 @@ def increment_unlocked_tests(username):
     conn.close()
 
 def get_all_notices():
-    """डेटाबेस से सभी नोटिस लाने के लिए (एरर सेफ्टी बैकअप के साथ)"""
+    """डेटाबेस से सभी नोटिस लाने के लिए (5-वैल्यू परफेक्ट मैच के साथ)"""
     notices = []
     try:
         conn = sqlite3.connect('database.db')
         cursor = conn.cursor()
-        cursor.execute("SELECT id, title, content, date FROM notices ORDER BY id DESC")
-        notices = cursor.fetchall()
+        # आपकी app.py के अनुसार 5 कॉलम (id, ntype, title, link, date) होने चाहिए
+        cursor.execute("SELECT id, title, content, date, date FROM notices ORDER BY id DESC")
+        raw_data = cursor.fetchall()
         conn.close()
+        
+        # इसे 5 वैल्यू के फॉर्मेट में सेट करना
+        for row in raw_data:
+            notices.append((row[0], "सामान्य", row[1], row[2], row[3]))
         return notices
     except Exception:
-        # अगर डेटाबेस में notices टेबल नहीं बनी है, तो लाइव ऐप क्रैश होने के बजाय ये डिफ़ॉल्ट नोटिस दिखाएगा
+        # अगर लाइव सर्वर पर टेबल नहीं है, तो यह 5 वैल्यू का डिफ़ॉल्ट नोटिस भेजेगा ताकि ऐप तुरंत खुल जाए
         default_notices = [
-            (1, "👋 डिजिटल पाठशाला में आपका स्वागत है!", "प्रिय छात्रों, आपकी ऑनलाइन कक्षाएं सुचारू रूप से लाइव हो चुकी हैं। मन लगाकर पढ़ाई करें!", "2026-05-29")
+            (1, "📢 नोटिस", "👋 डिजिटल पाठशाला में आपका स्वागत है!", "https://github.com", "2026-05-29")
         ]
         return default_notices
 
 def get_portal_info():
     """पोर्टल के नियम और प्लानिंग की जानकारी डिफ़ॉल्ट रूप से दिखाने के लिए"""
     rules = """
-    ### 📑 डिजिटल पाठशाला के नियम एवं स्टडी प्लान
+    ### 📑 डिजिटल पाठशाला के नियम एवं स्टडी充लना
     
-    #### 📦 Only Study (केवल पढ़ाई)充न:
+    #### 📦 Only Study (केवल पढ़ाई) प्लान:
     * ⏱️ नए छात्रों को 7 दिन का फ्री ट्रायल क्लास मिलेगा।
     * 🎓 विषयवार प्रीमियम वीडियो लेक्चर्स और पीडीएफ नोट्स।
     * 🎁 इस प्लान वाले छात्रों को हर महीने 1 ऑनलाइन मॉक टेस्ट बिल्कुल फ्री मिलेगा।
