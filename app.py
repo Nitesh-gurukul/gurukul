@@ -18,7 +18,7 @@ st.set_page_config(
 )
 
 # स्ट्रीमलिट का डिफ़ॉल्ट लोगो, मेनू और फुटर हटाने का CSS
-Q# 🛑 पुराने hide_streamlit_style को हटाकर इस नए वाले को पेस्ट करें:
+# 🛑 पुराने hide_streamlit_style को हटाकर इस नए वाले को पेस्ट करें:
 
 hide_streamlit_style = """
             <style>
