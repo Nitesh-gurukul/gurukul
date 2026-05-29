@@ -289,3 +289,21 @@ def increment_unlocked_tests(username):
     c.execute("UPDATE users SET unlocked_tests = unlocked_tests + 1 WHERE username = ?", (username,))
     conn.commit()
     conn.close()
+def get_portal_info():
+    """पोर्टल के नियम और प्लानिंग की जानकारी डेटाबेस से लाने के लिए"""
+    conn = sqlite3.connect('database.db')
+    cursor = conn.cursor()
+    
+    # यह चेक करेगा कि क्या टेबल में पहले से डेटा है, नहीं तो डिफ़ॉल्ट डेटा देगा
+    try:
+        cursor.execute("SELECT rules, planning FROM portal_info LIMIT 1")
+        result = cursor.fetchone()
+        if result:
+            conn.close()
+            return result[0], result[1]
+    except Exception:
+        # अगर टेबल नहीं बनी है, तो यह डिफ़ॉल्ट टेक्स्ट वापस भेजेगा ताकि ऐप क्रैश न हो
+        pass
+        
+    conn.close()
+    return "नियम अभी अपडेट नहीं किए गए हैं।", "प्लानिंग अभी अपडेट नहीं की गई है।"
